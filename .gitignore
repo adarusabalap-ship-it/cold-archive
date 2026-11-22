@@ -1,0 +1,5 @@
+# build output and raw capture frames are regenerated, never committed
+out/
+.captures/*.png
+serve.log
+node_modules/

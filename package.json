@@ -1,0 +1,11 @@
+{
+  "name": "cold-archive",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cold Archive — a top-down stealth game built for make.fun's best stealth game bounty",
+  "scripts": {
+    "serve": "node serve.ts",
+    "build": "node main.ts"
+  }
+}
