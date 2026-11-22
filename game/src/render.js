@@ -104,12 +104,15 @@ function drawSolids(ctx, floor) {
   const isCrate = (tx, ty) => floor.crates.some((c) => tx >= c.x && tx < c.x + c.w && ty >= c.y && ty < c.y + c.h);
   const isRack = (tx, ty) => floor.racks.some((r) => tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h);
 
-  // One shadow pass first, so no shadow falls on a neighbour's body.
+  // One shadow pass first, so no shadow falls on a neighbour's body. The offset is deliberately
+  // large and constant, because that offset is what makes a solid read as TALL: a box with no
+  // shadow is a rectangle painted on the floor, and cover you cannot see the height of is cover
+  // you do not trust.
   for (let ty = 0; ty < floor.rows; ty += 1) {
     for (let tx = 0; tx < floor.cols; tx += 1) {
       if (floor.at(tx, ty) !== SOLID) continue;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-      ctx.fillRect(tx * TILE + 4, ty * TILE + 6, TILE, TILE);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(tx * TILE + 7, ty * TILE + 9, TILE, TILE);
     }
   }
 
@@ -140,6 +143,11 @@ function drawSolids(ctx, floor) {
     const y = c.y * TILE;
     const w = c.w * TILE;
     const h = c.h * TILE;
+    // A tall side face on the right and bottom, in the shadowed tone: this is what turns a
+    // rectangle into a box with height, and height is what makes it read as cover.
+    ctx.fillStyle = 'rgba(12, 8, 4, 0.55)';
+    ctx.fillRect(x + w - 4, y + 4, 6, h + 4);
+    ctx.fillRect(x + 4, y + h - 4, w + 2, 6);
     ctx.strokeStyle = COLORS.crateEdge;
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
@@ -303,8 +311,12 @@ function drawCone(ctx, guard, floor) {
   const half = GUARD.coneHalfAngle;
   const steps = 44;
   const hot = guard.coneTint;
-  const fill = hot > 0.4 ? 'rgba(255, 92, 70, 0.34)' : 'rgba(255, 208, 120, 0.30)';
-  const rim = hot > 0.4 ? 'rgba(255, 150, 126, 1)' : 'rgba(255, 236, 178, 1)';
+  // Red, always. Amber sat in the same warm family as the wooden crates, so a beam and a box
+  // read as the same kind of thing; red is the one hue no prop uses, and it is the universal
+  // danger signal. Alerted goes hotter and more saturated. The rim is near-white so the beam's
+  // edge survives the downscale to a contact sheet.
+  const fill = hot > 0.4 ? 'rgba(255, 44, 32, 0.46)' : 'rgba(236, 52, 44, 0.30)';
+  const rim = hot > 0.4 ? 'rgba(255, 196, 186, 1)' : 'rgba(255, 154, 142, 0.92)';
 
   // The wedge, its far edge following whatever stops the light.
   const points = [];
@@ -351,7 +363,7 @@ function drawCone(ctx, guard, floor) {
     ctx.lineTo(guard.x + (p.x - guard.x) * 0.45, guard.y + (p.y - guard.y) * 0.45);
   }
   ctx.closePath();
-  ctx.fillStyle = hot > 0.4 ? 'rgba(255, 120, 96, 0.2)' : 'rgba(255, 230, 170, 0.18)';
+  ctx.fillStyle = hot > 0.4 ? 'rgba(255, 70, 52, 0.30)' : 'rgba(255, 92, 72, 0.20)';
   ctx.fill();
 }
 
@@ -468,44 +480,46 @@ function drawPlayer(ctx, player, floor, time) {
   ctx.arc(x, y, 20, 0, TAU);
   ctx.stroke();
 
-  // A soft halo, so the eye finds the player in a dark room without the body glowing.
-  const glow = ctx.createRadialGradient(x, y, 3, x, y, 26);
-  glow.addColorStop(0, 'rgba(79, 240, 216, 0.34)');
+  // A soft halo, so the eye finds the player in a dark room without the body glowing. Wide and
+  // strong, because "where am I" is the first question a stealth screenshot has to answer.
+  const glow = ctx.createRadialGradient(x, y, 3, x, y, 34);
+  glow.addColorStop(0, 'rgba(79, 240, 216, 0.46)');
+  glow.addColorStop(0.5, 'rgba(79, 240, 216, 0.14)');
   glow.addColorStop(1, 'rgba(79, 240, 216, 0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(x, y, 26, 0, TAU);
+  ctx.arc(x, y, 34, 0, TAU);
   ctx.fill();
 
   // Contact shadow.
   ctx.fillStyle = 'rgba(0,0,0,0.62)';
   ctx.beginPath();
-  ctx.ellipse(x + 2, y + 4, crouched ? 9 : 11, crouched ? 7 : 8, 0, 0, TAU);
+  ctx.ellipse(x + 3, y + 6, crouched ? 11 : 14, crouched ? 8 : 10, 0, 0, TAU);
   ctx.fill();
 
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(player.facing);   // the figure faces +x in its own frame
 
-  const shoulder = crouched ? 5.0 : 6.4;    // half the shoulder width
-  const reach = crouched ? 6.0 : 7.4;       // how far forward the hands sit
+  const shoulder = crouched ? 6.4 : 8.2;    // half the shoulder width
+  const reach = crouched ? 7.6 : 9.4;       // how far forward the hands sit
 
   // Shoulders and torso: one rounded bar across the body, dark inside, bright rim.
   ctx.fillStyle = COLORS.player;
-  roundRect(ctx, -6.5, -shoulder, 13, shoulder * 2, 4.5);
+  roundRect(ctx, -8.2, -shoulder, 16.4, shoulder * 2, 5.5);
   ctx.fill();
   ctx.fillStyle = COLORS.playerDark;
-  roundRect(ctx, -5.0, -shoulder + 1.6, 10, (shoulder - 1.6) * 2, 3.2);
+  roundRect(ctx, -6.3, -shoulder + 2, 12.6, (shoulder - 2) * 2, 3.8);
   ctx.fill();
 
   // Two arms reaching forward, ending in hands — the clearest "person" cue from above.
   ctx.strokeStyle = COLORS.player;
-  ctx.lineWidth = 2.6;
+  ctx.lineWidth = 3.2;
   ctx.lineCap = 'round';
   for (const side of [-1, 1]) {
     ctx.beginPath();
-    ctx.moveTo(1.5, side * (shoulder - 1.4));
-    ctx.lineTo(reach, side * (shoulder + (sprinting ? 1.4 : 0.4)));
+    ctx.moveTo(1.8, side * (shoulder - 1.8));
+    ctx.lineTo(reach, side * (shoulder + (sprinting ? 1.8 : 0.6)));
     ctx.stroke();
   }
   ctx.lineCap = 'butt';
@@ -513,13 +527,26 @@ function drawPlayer(ctx, player, floor, time) {
   // Head: a filled circle at the front, brighter than the body, with a dark visor gap.
   ctx.fillStyle = COLORS.playerHood;
   ctx.beginPath();
-  ctx.arc(1.2, 0, crouched ? 3.6 : 4.3, 0, TAU);
+  ctx.arc(1.6, 0, crouched ? 4.4 : 5.4, 0, TAU);
   ctx.fill();
   ctx.fillStyle = COLORS.playerDark;
   ctx.beginPath();
-  ctx.arc(2.4, 0, crouched ? 1.5 : 1.9, 0, TAU);
+  ctx.arc(3.0, 0, crouched ? 1.9 : 2.4, 0, TAU);
   ctx.fill();
 
+  ctx.restore();
+
+  // A facing arrow, outside the body, so the heading is legible even at thumbnail size.
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(player.facing);
+  ctx.fillStyle = 'rgba(79, 240, 216, 0.9)';
+  ctx.beginPath();
+  ctx.moveTo(reach + 9, 0);
+  ctx.lineTo(reach + 2.5, -3.6);
+  ctx.lineTo(reach + 2.5, 3.6);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 
   // Crouched: a dashed ring marks the tighter profile, the same language as the smaller radius.
@@ -835,10 +862,16 @@ export function drawFrame(ctx, state, floor, buffer, time) {
   drawDoors(ctx, floor);
   drawExit(ctx, floor, time);
   for (const card of floor.keycards) drawKeycard(ctx, card, time);
+
+  // Cones go UNDER the props. The cone geometry already truncates each ray at the first tile
+  // that blocks sight, so a beam stops at a crate's edge; drawing the crate afterwards makes
+  // that stop crisp and unmistakable. Drawn on top, a beam paints across the very box it is
+  // supposed to be blocked by, and no screenshot can show cover doing its job.
+  for (const g of state.guards) drawCone(ctx, g, floor);
+
   drawSolids(ctx, floor);
   drawPebbles(ctx, state.pebblesInAir);
 
-  for (const g of state.guards) drawCone(ctx, g, floor);
   drawLighting(ctx, floor, state.guards, state.player, buffer);
 
   for (const g of state.guards) drawGuard(ctx, g, time);
